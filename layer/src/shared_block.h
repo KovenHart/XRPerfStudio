@@ -98,7 +98,7 @@ struct SettingsBlock {
     float watchOpacity;         // 136 : 0.2 à 1
     float watchAlong;           // 140 : mètres
     float watchLift;            // 144 : mètres
-    uint32_t panelElements;     // 148 : ligne session / batterie du panneau, kWatchSession | kWatchBattery (0 : sans)
+    uint32_t panelElements;     // 148 : ligne session / batterie du panneau, kWatchSession | kWatchBattery | kPanelStutter (0 : sans)
     // Fenêtre du bureau capturée et affichée dans le casque (version 3).
     uint32_t windowEnabled;     // 152 : 0 ou 1
     uint32_t windowAnchor;      // 156 : énumération WindowAnchor (main gauche, main droite, posée dans l'espace)

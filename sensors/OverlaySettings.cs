@@ -51,6 +51,7 @@ namespace XRPerfSensors
         public bool Clock = true;
         public bool HeadsetInfo = true;
         public bool PanelSession, PanelBattery;  // ligne « session / batterie » du panneau (option, désactivée par défaut)
+        public bool PanelStutter;                // compteur de saccades sur cette ligne (option, désactivée par défaut)
         public bool PowerColumn;                 // dernière colonne du tableau CPU / GPU : puissance (W) au lieu de la fréquence
         public int Layout;
         public int Theme;
@@ -292,6 +293,7 @@ namespace XRPerfSensors
             s.HeadsetInfo = ReadBool(path, "headset_info", s.HeadsetInfo);
             s.PanelSession = ReadBool(path, "session", s.PanelSession);
             s.PanelBattery = ReadBool(path, "battery", s.PanelBattery);
+            s.PanelStutter = ReadBool(path, "stutter", s.PanelStutter);
             s.PowerColumn = ReadBool(path, "power", s.PowerColumn);
             s.Layout = ReadName(path, "layout", LayoutNames, s.Layout);
             s.Theme = ReadName(path, "theme", ThemeNames, s.Theme);
@@ -425,6 +427,7 @@ namespace XRPerfSensors
             else ok &= WritePrivateProfileStringW(Section, "headset_name", HeadsetName, path);
             ok &= WritePrivateProfileStringW(Section, "session", PanelSession ? "1" : "0", path);
             ok &= WritePrivateProfileStringW(Section, "battery", PanelBattery ? "1" : "0", path);
+            ok &= WritePrivateProfileStringW(Section, "stutter", PanelStutter ? "1" : "0", path);
             ok &= WritePrivateProfileStringW(Section, "power", PowerColumn ? "1" : "0", path);
             ok &= WritePrivateProfileStringW(Section, "layout", LayoutNames[Layout], path);
             ok &= WritePrivateProfileStringW(Section, "theme", ThemeNames[Theme], path);
@@ -547,7 +550,7 @@ namespace XRPerfSensors
             Put(block, 136, WatchOpacity);
             Put(block, 140, WatchAlong);
             Put(block, 144, WatchLift);
-            Put(block, 148, (PanelSession ? 1u : 0u) | (PanelBattery ? 2u : 0u)); // kWatchSession | kWatchBattery
+            Put(block, 148, (PanelSession ? 1u : 0u) | (PanelBattery ? 2u : 0u) | (PanelStutter ? 8u : 0u)); // kWatchSession | kWatchBattery | kPanelStutter
             Put(block, 152, WindowEnabled ? 1u : 0u);
             Put(block, 156, (uint)WindowAnchor);
             Put(block, 160, (uint)WindowPlacement);

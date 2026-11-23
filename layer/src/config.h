@@ -122,7 +122,7 @@ struct Config {
     std::vector<std::wstring> exclude;  // noms d'exécutables à ignorer (en minuscules)
     bool clock = true;                  // afficher l'heure dans le panneau
     bool headsetInfo = true;            // ligne "casque et résolution de rendu" en bas du panneau
-    uint32_t panelElements = 0;         // ligne "session / batterie" du panneau : kWatchSession | kWatchBattery
+    uint32_t panelElements = 0;         // ligne "session / batterie" du panneau : kWatchSession | kWatchBattery | kPanelStutter
     bool showPower = false;             // dernière colonne du tableau CPU / GPU : puissance (W) au lieu de la fréquence
     Layout layout = Layout::Classic;    // présentation du panneau
     ThemeId theme = ThemeId::Dark;      // couleurs

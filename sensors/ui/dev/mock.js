@@ -9,7 +9,7 @@
 
   const overlay = {
     Visible: true, Position: 5, Distance: 1.0, OffsetX: 0.34, OffsetY: 0.26, Width: 0.36, Opacity: 0.82, GlobalOpacity: 1.0, FaceViewer: true,
-    Clock: true, HeadsetInfo: true, PanelSession: true, PanelBattery: false, PowerColumn: false, VideoSource: "final",
+    Clock: true, HeadsetInfo: true, PanelSession: true, PanelBattery: false, PanelStutter: true, PowerColumn: false, VideoSource: "final",
     ImageAllowed: true, ImageMode: "off", ImageSharpen: "none", ImageSharpness: 100, ImageSharpenLimit: 10, ImageSharpenRadius: 1, ImageBrightness: 0, ImageContrast: 0, ImageSaturation: 0, ImageVibrance: 0,
     ImageGamma: 100, ImageShadows: 0, ImageTemperature: 0, ImageDeband: 0, ImageColorblind: "none", ImageHdr: 0, ImageBlack: 0, ImageWhite: 100, ImageClarity: 0,
     "Hotkey.toggle": 0x3004F, "Hotkey.position": 0x30050, "Hotkey.reset": 0x30052, "Hotkey.size_up": 0x30021, "Hotkey.size_down": 0x30022,

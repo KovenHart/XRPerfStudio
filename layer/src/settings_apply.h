@@ -103,7 +103,7 @@ inline void ApplySettings(Config& c, const SettingsBlock& s) {
     c.watch.opacity = clamped(s.watchOpacity, kMinWatchOpacity, kMaxWatchOpacity, c.watch.opacity);
     c.watch.along = clamped(s.watchAlong, kMinHandAlong, kMaxHandAlong, c.watch.along);
     c.watch.lift = clamped(s.watchLift, kMinHandLift, kMaxHandLift, c.watch.lift);
-    c.panelElements = s.panelElements & (kWatchSession | kWatchBattery);
+    c.panelElements = s.panelElements & (kWatchSession | kWatchBattery | kPanelStutter);
     c.showPower = s.power != 0;
     ImageSettings& im = c.image;
     im.mode = s.imageMode;

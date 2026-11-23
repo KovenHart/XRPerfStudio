@@ -728,6 +728,15 @@ void drawStatus(Canvas& cv, const PanelData& d, int y) {
             std::snprintf(buf, sizeof(buf), "--");
         cv.text(kFontLabel, kPad + Canvas::textWidth(kFontLabel, "SESSION") + kFontLabel.cellW, y, buf, th.text);
     }
+    if (d.statusElements & kPanelStutter) {
+        // Saccades depuis le début du rapport, au milieu (à gauche sans la session) ; le nombre passe en
+        // couleur d'alerte deux secondes après chaque saccade.
+        const char* label = d.english ? "STUTTERS" : "SACCADES";
+        const int x = (d.statusElements & kWatchSession) ? 230 : kPad;
+        cv.text(kFontLabel, x, y, label, th.muted);
+        std::snprintf(buf, sizeof(buf), "%u", d.stutters);
+        cv.text(kFontLabel, x + Canvas::textWidth(kFontLabel, label) + kFontLabel.cellW, y, buf, d.stutterRecent ? th.warn : th.text);
+    }
     if (d.statusElements & kWatchBattery) {
         const bool known = !std::isnan(d.battery[0]) || !std::isnan(d.battery[1]);
         if (!known) {

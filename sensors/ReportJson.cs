@@ -140,6 +140,10 @@ namespace XRPerfSensors
             Num(w, "gpuTempAvg", r.GpuTempAvg); Num(w, "gpuTempMax", r.GpuTempMax); Num(w, "gpuMHzAvg", r.GpuMHzAvg);
             Num(w, "vramAvg", r.VramAvg); Num(w, "vramMax", r.VramMax); Num(w, "vramTotal", r.VramTotal);
             Num(w, "budgetMs", !double.IsNaN(r.BudgetMs) ? r.BudgetMs : r.Target > 0 ? 1000.0 / r.Target : double.NaN);
+            Num(w, "stutters", r.Stutters); Num(w, "stuttersPerMin", r.StuttersPerMinute); Num(w, "stutterLost", r.StutterLostSeconds);
+            Num(w, "stutterWorstMs", r.StutterWorstMs); Num(w, "stutterWorstRatio", r.StutterWorstRatio);
+            w.WriteString("stutterWorstAt", r.StutterWorstAt);
+            Num(w, "stutterLight", r.StutterLight); Num(w, "stutterModerate", r.StutterModerate); Num(w, "stutterSevere", r.StutterSevere);
             Values(w, "distribution", r.Distribution);
             w.WriteEndObject();
 
@@ -158,6 +162,7 @@ namespace XRPerfSensors
                 Values(w, "cpuTemp", r.Minutes.ConvertAll(m => m.CpuTemp));
                 Values(w, "gpuTemp", r.Minutes.ConvertAll(m => m.GpuTemp));
                 Values(w, "vram", r.Minutes.ConvertAll(m => m.VramGb));
+                Values(w, "stutters", r.Minutes.ConvertAll(m => m.Stutters));
                 w.WriteEndObject();
             }
 

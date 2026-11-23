@@ -18,6 +18,8 @@ namespace XRPerfSensors
         public int Minute;
         public double FpsAvg = double.NaN, FpsMin = double.NaN, CpuMs = double.NaN, GpuMs = double.NaN;
         public double CpuLoad = double.NaN, GpuLoad = double.NaN, CpuTemp = double.NaN, GpuTemp = double.NaN, VramGb = double.NaN;
+        /// <summary>Saccades de cette minute (NaN : rapport d'avant la 1.17).</summary>
+        public double Stutters = double.NaN;
         /// <summary>Temps GPU de cette minute estimé faute de mesure (affiché "~" dans le rapport).</summary>
         public bool GpuEstimated;
     }
@@ -69,6 +71,14 @@ namespace XRPerfSensors
         public double CpuLoadAvg = double.NaN, CpuLoadMax = double.NaN, CpuTempAvg = double.NaN, CpuTempMax = double.NaN, CpuMHzAvg = double.NaN;
         public double GpuLoadAvg = double.NaN, GpuLoadMax = double.NaN, GpuTempAvg = double.NaN, GpuTempMax = double.NaN, GpuMHzAvg = double.NaN;
         public double VramAvg = double.NaN, VramMax = double.NaN, VramTotal = double.NaN;
+        /// <summary>
+        /// Saccades (section SACCADES, depuis la 1.17 ; NaN avant) : nombre, par minute de jeu, temps perdu (s), pire
+        /// (ms, moment « m:ss », rapport à la cadence), et répartition légères / modérées / fortes.
+        /// </summary>
+        public double Stutters = double.NaN, StuttersPerMinute = double.NaN, StutterLostSeconds = double.NaN;
+        public double StutterWorstMs = double.NaN, StutterWorstRatio = double.NaN;
+        public string StutterWorstAt = "";
+        public double StutterLight = double.NaN, StutterModerate = double.NaN, StutterSevere = double.NaN;
 
         /// <summary>Répartition des temps d'image : dans le budget, jusqu'à 1,5 x, de 1,5 à 2 x, plus de 2 x (en %).</summary>
         public double[] Distribution = { double.NaN, double.NaN, double.NaN, double.NaN };
@@ -240,6 +250,7 @@ namespace XRPerfSensors
                 {
                     section = distribution ? "DIST" : minutes ? "MINUTES"
                             : Starts(line, "IMAGES PAR SECONDE", "FRAMES PER SECOND") ? "FPS"
+                            : Starts(line, "SACCADES", "STUTTERS") ? "STUTTER"
                             : Starts(line, "TEMPS PAR IMAGE", "FRAME TIME") ? "FRAME"
                             : Starts(line, "PROCESSEUR", "PROCESSOR") ? "CPU"
                             : Starts(line, "CARTE GRAPHIQUE", "GRAPHICS CARD") ? "GPU"
@@ -262,6 +273,7 @@ namespace XRPerfSensors
                     {
                         Minute = (int)v[0], FpsAvg = v[1], FpsMin = v[2], CpuMs = v[3], GpuMs = v[4],
                         CpuLoad = v[5], GpuLoad = v[6], CpuTemp = v[7], GpuTemp = v[8], VramGb = v[9],
+                        Stutters = v.Count > 10 ? v[10] : double.NaN,
                         GpuEstimated = !MinutesGpuMeasured || (cells.Length > 4 && cells[4].StartsWith("~")),
                     });
                     continue;
@@ -318,6 +330,25 @@ namespace XRPerfSensors
                     else if (Is(label, "Avec framegen", "With framegen")) OutFps = At(v, 0);  // vérifié plus bas avec la moyenne
                     else if (Is(label, "Images rendues", "Frames rendered")) Frames = At(v, 0);
                     else if (Is(label, "Coupures", "Interruptions")) Pauses = At(v, 0);
+                    continue;
+                }
+
+                if (section == "STUTTER")
+                {
+                    List<double> v = Numbers(value);
+                    if (Is(label, "Saccades", "Stutters")) { Stutters = At(v, 0); StuttersPerMinute = At(v, 1); }
+                    else if (Is(label, "Temps perdu", "Time lost")) StutterLostSeconds = At(v, 0);
+                    else if (Is(label, "Pire saccade", "Worst stutter"))
+                    {
+                        StutterWorstMs = At(v, 0);
+                        Match at = Regex.Match(value, @"(\d+:\d\d)");
+                        StutterWorstAt = at.Success ? at.Groups[1].Value : "";
+                        Match ratio = Regex.Match(value, @"([\d.,]+) x");
+                        StutterWorstRatio = ratio.Success ? At(Numbers(ratio.Groups[1].Value), 0) : double.NaN;
+                    }
+                    else if (Is(label, "Légères", "Light")) StutterLight = At(v, 0);
+                    else if (Is(label, "Modérées", "Moderate")) StutterModerate = At(v, 0);
+                    else if (Is(label, "Fortes", "Severe")) StutterSevere = At(v, 0);
                     continue;
                 }
 
@@ -657,6 +688,26 @@ namespace XRPerfSensors
                 Add(findings, level, string.Format(CultureInfo.InvariantCulture,
                     L("La cible de {0} images par seconde a été tenue {1} % du temps (moyenne {2}).", "The {0} frames per second target was held {1} % of the time (average {2})."),
                     F(r.Target, "0"), F(r.TargetHeld, "0"), F(r.FpsAvg, "0.0")));
+            }
+
+            // 1 bis. Saccades (rapports de la 1.17 et après) : moins d'une par minute sans forte, rien d'inquiétant ;
+            // jusqu'à 4 par minute (ou des fortes), à surveiller ; au-delà, gênant.
+            if (!double.IsNaN(r.Stutters))
+            {
+                if (r.Stutters == 0)
+                    Add(findings, FindingLevel.Good, L("Aucune saccade : la cadence est restée régulière.", "No stutters: the frame rate stayed steady."));
+                else
+                {
+                    double perMinute = double.IsNaN(r.StuttersPerMinute) ? 0 : r.StuttersPerMinute;
+                    bool severe = r.StutterSevere > 0;
+                    FindingLevel level = perMinute >= 4 ? FindingLevel.Problem : perMinute >= 1 || severe ? FindingLevel.Warning : FindingLevel.Info;
+                    string worst = double.IsNaN(r.StutterWorstMs) ? "" : string.Format(CultureInfo.InvariantCulture,
+                        L(" ; la pire : {0} ms{1}", "; the worst: {0} ms{1}"), F(r.StutterWorstMs, "0"),
+                        r.StutterWorstAt.Length > 0 ? string.Format(CultureInfo.InvariantCulture, L(" à {0}", " at {0}"), r.StutterWorstAt) : "");
+                    Add(findings, level, string.Format(CultureInfo.InvariantCulture,
+                        L("{0} saccade{1} ({2} par minute de jeu), {3} s perdues au total{4}.", "{0} stutter{1} ({2} per minute of play), {3} s lost in total{4}."),
+                        F(r.Stutters, "0"), r.Stutters > 1 ? "s" : "", F(perMinute, "0.0"), F(r.StutterLostSeconds, "0.00"), worst));
+                }
             }
 
             // 2. Ce qui semble limiter.

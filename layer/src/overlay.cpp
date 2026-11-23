@@ -1208,6 +1208,8 @@ void Overlay::sample(double now) {
     // Ligne session / batterie (option). La batterie vient du runtime, comme pour la montre.
     data.statusElements = m_config.panelElements;
     data.sessionSeconds = now - m_sessionStart;
+    data.stutters = m_sessionStats.stutterCount();
+    data.stutterRecent = m_sessionStats.lastStutterTime() >= 0.0 && now - m_sessionStats.lastStutterTime() < 2.0;
     // Témoin d'enregistrement manuel (en cours, rapport écrit, trop court).
     data.recordState = m_reportControl.indicator(now, m_recording && m_recordManual, m_recordStart, data.recordSeconds);
     // Pour XRPerfVR, s'il affiche le panneau de ce jeu à la place de la layer (Vulkan, OpenGL).

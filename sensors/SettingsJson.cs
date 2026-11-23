@@ -33,6 +33,7 @@ namespace XRPerfSensors
             w.WriteBoolean("HeadsetInfo", o.HeadsetInfo);
             w.WriteBoolean("PanelSession", o.PanelSession);
             w.WriteBoolean("PanelBattery", o.PanelBattery);
+            w.WriteBoolean("PanelStutter", o.PanelStutter);
             w.WriteBoolean("PowerColumn", o.PowerColumn);
             w.WriteNumber("Layout", o.Layout);
             w.WriteNumber("Theme", o.Theme);
@@ -224,6 +225,7 @@ namespace XRPerfSensors
                     return true;
                 case "PanelSession": if (!Bool(v, out b)) return false; o.PanelSession = b; return true;
                 case "PanelBattery": if (!Bool(v, out b)) return false; o.PanelBattery = b; return true;
+                case "PanelStutter": if (!Bool(v, out b)) return false; o.PanelStutter = b; return true;
                 case "PowerColumn": if (!Bool(v, out b)) return false; o.PowerColumn = b; return true;
                 case "Layout": if (!Int(v, 0, OverlaySettings.LayoutNames.Length - 1, out i)) return false; o.Layout = i; return true;
                 case "Theme": if (!Int(v, 0, OverlaySettings.ThemeNames.Length - 1, out i)) return false; o.Theme = i; return true;

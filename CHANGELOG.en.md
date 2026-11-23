@@ -4,6 +4,13 @@
 
 What's new in each version of XR Perf Overlay, most recent first.
 
+## 1.17.0
+
+- **Stutters measured**: a stutter is a frame more than twice as long as the rate of the previous half second; several in a row count as one, and a lasting drop in rate (reprojection) is not one.
+  - **Report**: new *Stutters* section with the number and frequency per minute of play, the time lost, the worst one (duration, moment, ratio to the rate) and the light / moderate / severe breakdown; *Stut.* column in the minute-by-minute log.
+  - **Reports page**: Stutters section in the detailed view, stutters-per-minute chart, a finding in the analysis, two lines in the session comparison.
+  - **Panel**: optional stutter counter on the session line (Panel › Appearance), in orange for two seconds after each stutter. OpenXR and SteamVR games.
+
 ## 1.16.4
 
 - **Image filters with no effect in some games** (the GTAVXR mod, for example): when the image sent to the headset is never the one the game has just rendered (the game changes image or swapchain each time), the filters were not applied. The layer now detects this and filters the image when it is submitted to the headset.

@@ -855,7 +855,7 @@ namespace XRPerfSensors
             OverlaySettings o = _overlay;
             o.Visible = fresh.Visible; o.Position = fresh.Position; o.Distance = fresh.Distance; o.OffsetX = fresh.OffsetX; o.OffsetY = fresh.OffsetY;
             o.Width = fresh.Width; o.Opacity = fresh.Opacity; o.GlobalOpacity = fresh.GlobalOpacity; o.FaceViewer = fresh.FaceViewer;
-            o.Clock = fresh.Clock; o.HeadsetInfo = fresh.HeadsetInfo; o.PanelSession = fresh.PanelSession; o.PanelBattery = fresh.PanelBattery;
+            o.Clock = fresh.Clock; o.HeadsetInfo = fresh.HeadsetInfo; o.PanelSession = fresh.PanelSession; o.PanelBattery = fresh.PanelBattery; o.PanelStutter = fresh.PanelStutter;
             o.PowerColumn = fresh.PowerColumn;
             o.Layout = fresh.Layout; o.Theme = fresh.Theme;
             o.CustomBackground = fresh.CustomBackground; o.CustomText = fresh.CustomText; o.CustomAccent = fresh.CustomAccent;

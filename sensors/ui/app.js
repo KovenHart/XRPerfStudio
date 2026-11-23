@@ -1057,6 +1057,7 @@ window.App = (function () {
         headsetNameRow(),
         switchCtl("overlay", "PanelSession", t("app.session")),
         switchCtl("overlay", "PanelBattery", t("app.battery"), t("app.battery.help")),
+        switchCtl("overlay", "PanelStutter", t("app.stutter"), t("app.stutter.help")),
         switchCtl("overlay", "PowerColumn", t("app.power"), t("app.power.help")),
       ]),
       defaultsButton(),
@@ -2196,6 +2197,22 @@ window.App = (function () {
       stat(t("rep.low01"), num(n.low01, 1), t("unit.fps")),
       n.outFps != null ? stat(t("rep.fg"), num(n.outFps, 1), t("unit.fps")) : null)));
 
+    // Saccades (rapports de la 1.17 et après).
+    if (n.stutters != null) {
+      const kinds = [["light", n.stutterLight, "var(--warn)"], ["moderate", n.stutterModerate, "color-mix(in srgb, var(--warn) 50%, var(--bad))"], ["severe", n.stutterSevere, "var(--bad)"]];
+      const total = kinds.reduce((sum, k) => sum + (k[1] || 0), 0);
+      box.appendChild(h("section", { class: "sec" }, h("h3", { text: t("rep.stutterSec") }),
+        h("p", { class: "muted small", text: t("rep.stutterDef") }),
+        h("div", { class: "stats" },
+          stat(t("rep.stutters"), num(n.stutters), null, n.stuttersPerMin != null ? t("rep.stutters.perMin", { n: num(n.stuttersPerMin, 1) }) : null),
+          stat(t("rep.stutterLost"), num(n.stutterLost, 2), "s"),
+          stat(t("rep.stutterWorst"), num(n.stutterWorstMs), t("unit.ms"),
+            n.stutterWorstAt ? t("rep.stutterWorstAt", { at: n.stutterWorstAt, x: num(n.stutterWorstRatio, 1) }) : null)),
+        total > 0 ? h("div", { class: "dist", role: "img", "aria-label": t("rep.stutterSec") },
+          kinds.map(k => (k[1] > 0 ? h("i", { style: { flex: String(k[1]), background: k[2] }, title: `${t("rep.stutter." + k[0])} : ${num(k[1])}` }) : null))) : null,
+        h("div", { class: "figure-cap" }, kinds.map(k => h("span", { class: "k" }, h("i", { style: { background: k[2] } }), `${t("rep.stutter." + k[0])} ${num(k[1])}`)))));
+    }
+
     const gpuLabel = n.gpuIsMeasured ? t("rep.gpuMeasured") : t("rep.gpuEstimated");
     box.appendChild(h("section", { class: "sec" }, h("h3", { text: t("rep.frameSec") + " (" + t("unit.ms") + ")" }),
       h("table", { class: "grid" },
@@ -2250,7 +2267,9 @@ window.App = (function () {
       Charts.line(Object.assign({}, common, { title: t("chart.vram"), unit: t("unit.gb"), digits: 1, min: 0, height: 100,
         series: [{ name: t("chart.vram"), color: cssVar("--s-vram"), values: m.vram }],
         refs: n.vramTotal ? [{ value: n.vramTotal, label: t("chart.total") + " " + num(n.vramTotal, 1) }] : [] })),
-    ];
+      m.stutters && m.stutters.some(v => v != null) ? Charts.line(Object.assign({}, common, { title: t("chart.stutters"), digits: 0, min: 0, height: 100,
+        series: [{ name: t("rep.stutters"), color: cssVar("--warn"), values: m.stutters }] })) : null,
+    ].filter(Boolean);
   }
 
   // Comparaison : tableau des écarts et les deux courbes de FPS.
@@ -2271,6 +2290,7 @@ window.App = (function () {
       ["rep.c.fpsAvg", "fpsAvg", 1, true], ["rep.c.fpsMin", "fpsMin", 0, true], ["rep.low1", "low1", 1, true], ["rep.low01", "low01", 1, true],
       ["rep.c.held", "targetHeld", 0, true], ["rep.c.fg", "outFps", 1, true], ["rep.c.frame", "frameAvg", 1, false], ["rep.c.cpu", "cpuMsAvg", 1, false],
       ["rep.c.gpu", "gpuMsAvg", 1, false], ["rep.c.cpuLoad", "cpuLoadAvg", 0, null], ["rep.c.gpuLoad", "gpuLoadAvg", 0, null],
+      ["rep.c.stutters", "stuttersPerMin", 1, false], ["rep.c.stutterLost", "stutterLost", 2, false],
       ["rep.c.cpuTemp", "cpuTempMax", 0, false], ["rep.c.gpuTemp", "gpuTempMax", 0, false], ["rep.c.vram", "vramMax", 1, null],
     ];
     const tbody = h("tbody");

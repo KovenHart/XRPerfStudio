@@ -69,12 +69,17 @@ class SessionStats {
         m_gpuRejected = false;
         m_rejectedMeasured = m_rejectedEstimate = m_rejectedLoad = 0.f;
         m_start = -1.0;
+        m_stutter = Stutter();
         m_minutes.clear();
         m_minutes.reserve(180);  // trois heures sans nouvelle allocation
     }
 
     // Durée cumulée des images mesurées (les coupures de plus d'une seconde ne comptent pas).
     double activeSeconds() const { return m_activeSeconds; }
+
+    // Saccades depuis le début du rapport (compteur du panneau), et instant de la dernière (< 0 : aucune).
+    uint32_t stutterCount() const { return m_stutter.count; }
+    double lastStutterTime() const { return m_stutter.lastTime; }
 
     // À chaque image soumise. `cpuMs` peut valoir NaN.
     void onFrame(double now, float cpuMs) {
@@ -87,13 +92,18 @@ class SessionStats {
                 ++m_histogram[bucketOf(ms)];
                 if (ms > m_worstMs) m_worstMs = ms;
                 m_cpuFrame.add(cpuMs);
-                if (Minute* m = minuteAt(now)) {
-                    m->activeSeconds += dt;
-                    ++m->frames;
-                    m->cpuMs.add(cpuMs);
+                Minute* minute = minuteAt(now);
+                if (minute) {
+                    minute->activeSeconds += dt;
+                    ++minute->frames;
+                    minute->cpuMs.add(cpuMs);
                 }
+                onStutterFrame(now, ms, minute);
             } else if (dt > kPauseSeconds) {
                 ++m_pauses;  // chargement, pause, casque retiré
+                endStutter();
+                m_stutter.base = -1.f;  // la cadence repart de zéro après une coupure
+                m_stutter.warm = 0;
             }
         }
         m_lastFrame = now;
@@ -255,6 +265,31 @@ class SessionStats {
         w.put(T("  Coupures       : %u   (chargements et pauses de plus d'une seconde, non comptés)\r\n",
                 "  Interruptions  : %u   (loading and pauses longer than one second, not counted)\r\n"), m_pauses);
 
+        // Saccades : images plus de 2 fois plus longues que la cadence de la demi-seconde précédente.
+        if (m_frames > 0) {
+            Stutter st = m_stutter;  // copie : une saccade en cours est classée comme si elle s'arrêtait là
+            if (st.active) {
+                if (st.peakRatio >= 5.f) ++st.severe;
+                else if (st.peakRatio >= 3.f) ++st.moderate;
+                else ++st.light;
+            }
+            const double perMinute = m_activeSeconds > 0.0 ? static_cast<double>(st.count) * 60.0 / m_activeSeconds : 0.0;
+            w.put(T("\r\nSACCADES   (image plus de 2 fois plus longue que la cadence de la demi-seconde précédente)\r\n",
+                    "\r\nSTUTTERS   (frame more than twice as long as the rate of the previous half second)\r\n"));
+            w.put(T("  Saccades       : %u   (%.1f par minute de jeu)\r\n", "  Stutters       : %u   (%.1f per minute of play)\r\n"), st.count, perMinute);
+            w.put(T("  Temps perdu    : %.2f s   (au-delà de la cadence normale)\r\n", "  Time lost      : %.2f s   (beyond the normal rate)\r\n"), st.lostMs / 1000.0);
+            if (st.count > 0) {
+                const int at = static_cast<int>(st.worstAt);
+                w.put(T("  Pire saccade   : %.0f ms   (à %d:%02d, %.1f x la cadence)\r\n", "  Worst stutter  : %.0f ms   (at %d:%02d, %.1f x the rate)\r\n"),
+                      static_cast<double>(st.worstMs), at / 60, at % 60, static_cast<double>(st.worstRatio));
+            } else {
+                w.put(T("  Pire saccade   : --\r\n", "  Worst stutter  : --\r\n"));
+            }
+            w.put(T("  Légères        : %u   (2 à 3 x la cadence)\r\n", "  Light          : %u   (2 to 3 x the rate)\r\n"), st.light);
+            w.put(T("  Modérées       : %u   (3 à 5 x)\r\n", "  Moderate       : %u   (3 to 5 x)\r\n"), st.moderate);
+            w.put(T("  Fortes         : %u   (plus de 5 x)\r\n", "  Severe         : %u   (over 5 x)\r\n"), st.severe);
+        }
+
         w.put(T("\r\nTEMPS PAR IMAGE (ms)       moyenne       max\r\n", "\r\nFRAME TIME (ms)            average       max\r\n"));
         w.put(T("  Image complète         %8s  %8s   (intervalle entre deux images)\r\n", "  Whole frame            %8s  %8s   (interval between two frames)\r\n"),
               num(a, 1000.f / avgFps, 1), num(b, m_frames > 0 ? m_worstMs : std::nanf(""), 1));
@@ -299,8 +334,8 @@ class SessionStats {
                   !measured ? T("estimé", "estimated")
                   : mixed   ? T("mesuré ; ~ = estimé, minute sans mesure", "measured; ~ = estimated, minute without measurement")
                             : T("mesuré", "measured"));
-            w.put(T("  minute  FPS moy  FPS min  CPU ms  GPU ms  CPU %%  GPU %%  CPU °C  GPU °C  VRAM Go\r\n",
-                    "  minute  FPS avg  FPS min  CPU ms  GPU ms  CPU %%  GPU %%  CPU °C  GPU °C  VRAM GB\r\n"));
+            w.put(T("  minute  FPS moy  FPS min  CPU ms  GPU ms  CPU %%  GPU %%  CPU °C  GPU °C  VRAM Go  Sacc.\r\n",
+                    "  minute  FPS avg  FPS min  CPU ms  GPU ms  CPU %%  GPU %%  CPU °C  GPU °C  VRAM GB  Stut.\r\n"));
             char e[32], f[32], g[32], h[32], k[32], l[32];
             for (size_t i = 0; i < m_minutes.size(); ++i) {
                 const Minute& r = m_minutes[i];
@@ -309,9 +344,9 @@ class SessionStats {
                     std::snprintf(e, sizeof(e), "~%.1f", static_cast<double>(r.gpuEstimate.avg()));
                 else
                     num(e, measured ? r.gpuMeasured.avg() : r.gpuEstimate.avg(), 1);
-                w.put("  %6u  %7s  %7s  %6s  %6s  %5s  %5s  %6s  %6s  %7s\r\n", static_cast<unsigned>(i + 1), num(a, fps, 1), num(b, r.fps.min(), 0),
+                w.put("  %6u  %7s  %7s  %6s  %6s  %5s  %5s  %6s  %6s  %7s  %5u\r\n", static_cast<unsigned>(i + 1), num(a, fps, 1), num(b, r.fps.min(), 0),
                       num(c, r.cpuMs.avg(), 1), e, num(f, r.cpuLoad.avg(), 0), num(g, r.gpuLoad.avg(), 0), num(h, r.cpuTemp.avg(), 0),
-                      num(k, r.gpuTemp.avg(), 0), num(l, r.vram.avg() / 1024.f, 1));
+                      num(k, r.gpuTemp.avg(), 0), num(l, r.vram.avg() / 1024.f, 1), r.stutters);
             }
         }
 
@@ -398,8 +433,79 @@ class SessionStats {
     struct Minute {
         double activeSeconds = 0.0;
         uint32_t frames = 0;
+        uint32_t stutters = 0;
         Accum fps, cpuMs, gpuMeasured, gpuEstimate, cpuLoad, gpuLoad, cpuTemp, gpuTemp, vram;
     };
+
+    // Saccades. Cadence de référence : moyenne glissante (environ une demi-seconde) des temps d'image,
+    // sans les images lentes elles-mêmes. Une image plus de 2 fois plus longue (et d'au moins 4 ms de plus)
+    // est une saccade ; plusieurs d'affilée n'en font qu'une. Un ralentissement qui dure (plus d'un quart de
+    // seconde : passage en reprojection, zone plus lourde) devient la nouvelle cadence de référence.
+    static constexpr float kStutterRatio = 2.f;
+    static constexpr float kStutterMinExtraMs = 4.f;
+    static constexpr double kStutterBaseSeconds = 0.5;
+    static constexpr double kStutterRebaseSeconds = 0.25;
+    static constexpr uint32_t kStutterWarmFrames = 15;
+    struct Stutter {
+        float base = -1.f;        // cadence de référence (ms par image), < 0 : à prendre sur l'image suivante
+        uint32_t warm = 0;        // images depuis le début ou la dernière coupure
+        bool active = false;      // saccade en cours (images lentes d'affilée)
+        float peakRatio = 0.f;    // pire rapport à la cadence pendant la saccade en cours
+        double slowSeconds = 0.0; // durée de la saccade en cours
+        uint32_t count = 0, light = 0, moderate = 0, severe = 0;
+        double lostMs = 0.0;      // temps au-delà de la cadence de référence, toutes saccades
+        float worstMs = 0.f, worstRatio = 0.f;
+        double worstAt = 0.0;     // secondes depuis le début du rapport
+        double lastTime = -1.0;
+    };
+
+    void onStutterFrame(double now, float ms, Minute* minute) {
+        Stutter& st = m_stutter;
+        if (st.base < 0.f) {
+            st.base = ms;
+            st.warm = 1;
+            return;
+        }
+        const bool slow = st.warm >= kStutterWarmFrames && ms >= kStutterRatio * st.base && ms - st.base >= kStutterMinExtraMs;
+        if (slow) {
+            const float ratio = ms / st.base;
+            if (!st.active) {
+                st.active = true;
+                st.peakRatio = 0.f;
+                st.slowSeconds = 0.0;
+                ++st.count;
+                if (minute) ++minute->stutters;
+            }
+            st.lastTime = now;
+            st.slowSeconds += ms / 1000.0;
+            st.lostMs += ms - st.base;
+            if (ratio > st.peakRatio) st.peakRatio = ratio;
+            if (ms > st.worstMs) {
+                st.worstMs = ms;
+                st.worstRatio = ratio;
+                st.worstAt = m_start >= 0.0 ? now - m_start : 0.0;
+            }
+            // Ralentissement durable : nouvelle cadence, la saccade s'arrête là.
+            if (st.slowSeconds >= kStutterRebaseSeconds) {
+                endStutter();
+                st.base = ms;
+            }
+            return;
+        }
+        endStutter();
+        ++st.warm;
+        const double k = std::fmin(1.0, (ms / 1000.0) / kStutterBaseSeconds);
+        st.base += static_cast<float>((ms - st.base) * k);
+    }
+
+    void endStutter() {
+        Stutter& st = m_stutter;
+        if (!st.active) return;
+        st.active = false;
+        if (st.peakRatio >= 5.f) ++st.severe;
+        else if (st.peakRatio >= 3.f) ++st.moderate;
+        else ++st.light;
+    }
     static constexpr size_t kMaxMinutes = 24 * 60;
 
     // Minute de la session qui contient l'instant `now` (créée au besoin), ou nul au-delà de 24 h.
@@ -451,6 +557,7 @@ class SessionStats {
     float m_rejectedMeasured, m_rejectedEstimate, m_rejectedLoad;
     double m_start;                           // instant du premier relevé (début des minutes)
     std::vector<Minute> m_minutes;
+    Stutter m_stutter;
 };
 
 }  // namespace xrpo

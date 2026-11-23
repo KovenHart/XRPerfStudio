@@ -79,8 +79,10 @@ struct PanelData {
     bool showPower = false;  // dernière colonne : puissance (W) au lieu de la fréquence (MHz)
 
     // Ligne de session (option) sous le corps du panneau : temps de session et batterie des manettes.
-    uint32_t statusElements = 0;  // kWatchSession | kWatchBattery ; 0 : pas de ligne
+    uint32_t statusElements = 0;  // kWatchSession | kWatchBattery | kPanelStutter ; 0 : pas de ligne
     double sessionSeconds = -1.0;  // < 0 : inconnu
+    uint32_t stutters = 0;         // saccades depuis le début du rapport (kPanelStutter)
+    bool stutterRecent = false;    // une saccade il y a moins de 2 s : le compteur passe en couleur d'alerte
     float battery[2] = {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN()};  // 0 à 1, NaN : inconnue
     bool charging[2] = {false, false};
 
@@ -174,6 +176,7 @@ constexpr uint32_t kWatchSession = 1;  // temps écoulé depuis le début de la 
 constexpr uint32_t kWatchBattery = 2;  // batterie des manettes
 constexpr uint32_t kWatchFps = 4;      // images par seconde
 constexpr uint32_t kWatchAllElements = kWatchSession | kWatchBattery | kWatchFps;
+constexpr uint32_t kPanelStutter = 8;  // panneau seulement : compteur de saccades sur la ligne de session
 
 struct WatchData {
     WatchStyle style = WatchStyle::Classic;

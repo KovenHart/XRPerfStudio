@@ -87,6 +87,7 @@ int xrpoRenderPreview(const xrpo::SettingsBlock* settings, const xrpo::SensorBlo
         // Ligne session / batterie : valeurs d'exemple, comme sur l'aperçu de la montre.
         data.statusElements = config.panelElements;
         data.sessionSeconds = 1 * 3600 + 23 * 60 + 45;
+        data.stutters = 3;  // compteur de saccades (option)
         data.battery[0] = 0.8f;
         data.battery[1] = 0.35f;
         const std::string name = headsetName ? AsciiText(headsetName, 256) : std::string();

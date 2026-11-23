@@ -291,9 +291,9 @@ static void testSessionStats(const std::string& dir) {
     assert(has(text, "  De 1,5 \xC3\xA0 2 x le budget  :   2.0 %\r\n") && has(text, "  Plus de 2 x le budget   :   0.0 %\r\n"));
     // Releve minute par minute : 11 minutes (la coupure de 8 s decale la fin), FPS d'une minute pleine a ~35,6, GPU estime.
     assert(has(text, "RELEV\xC3\x89 MINUTE PAR MINUTE   (GPU ms : estim\xC3\xA9)\r\n"));
-    assert(has(text, "  minute  FPS moy  FPS min  CPU ms  GPU ms  CPU %  GPU %  CPU \xC2\xB0" "C  GPU \xC2\xB0" "C  VRAM Go\r\n"));
-    assert(has(text, "       1     35.4       36    15.9    20.3     35     73      57      64     23.4\r\n"));
-    assert(has(text, "      11     35.5       31    15.9    20.6     35     73      57      64     23.4\r\n") && text.find("      12  ") == std::string::npos);
+    assert(has(text, "  minute  FPS moy  FPS min  CPU ms  GPU ms  CPU %  GPU %  CPU \xC2\xB0" "C  GPU \xC2\xB0" "C  VRAM Go  Sacc.\r\n"));
+    assert(has(text, "       1     35.4       36    15.9    20.3     35     73      57      64     23.4      0\r\n"));
+    assert(has(text, "      11     35.5       31    15.9    20.6     35     73      57      64     23.4      0\r\n") && text.find("      12  ") == std::string::npos);
     assert(text.find("GPU (mesur") == std::string::npos);
     writeFile(dir + "/resume_exemple.txt", text);
 
@@ -304,8 +304,8 @@ static void testSessionStats(const std::string& dir) {
     assert(has(text, "Le temps GPU mesur\xC3\xA9 est l'\xC3\xA9" "cart"));
     // Mesures sur la premiere minute seulement : les suivantes reprennent l'estimation, marquee "~".
     assert(has(text, "(GPU ms : mesur\xC3\xA9 ; ~ = estim\xC3\xA9, minute sans mesure)\r\n"));
-    assert(has(text, "       1     35.4       36    15.9    18.5     35     73      57      64     23.4\r\n"));
-    assert(has(text, "      11     35.5       31    15.9   ~20.6     35     73      57      64     23.4\r\n"));
+    assert(has(text, "       1     35.4       36    15.9    18.5     35     73      57      64     23.4      0\r\n"));
+    assert(has(text, "      11     35.5       31    15.9   ~20.6     35     73      57      64     23.4      0\r\n"));
     writeFile(dir + "/resume_exemple_mixte.txt", text);
 
     // Mesure ecartee (non representative) : plus de ligne ni de releve "mesure", une explication.
@@ -315,7 +315,7 @@ static void testSessionStats(const std::string& dir) {
         rj.onGpuFrame(t, 0.3f);   // ignoree
         const std::string r = rj.format(info);
         assert(r.find("GPU (mesur") == std::string::npos && r.find("~") == std::string::npos && has(r, "(GPU ms : estim\xC3\xA9)\r\n"));
-        assert(has(r, "       1     35.4       36    15.9    20.3     35     73      57      64     23.4\r\n"));
+        assert(has(r, "       1     35.4       36    15.9    20.3     35     73      57      64     23.4      0\r\n"));
         assert(has(r, "Mesure r\xC3\xA9" "elle du temps GPU \xC3\xA9" "cart\xC3\xA9" "e : 0.2 ms mesur\xC3\xA9 contre 12.4 ms estim\xC3\xA9, carte charg\xC3\xA9" "e \xC3\xA0 88 %."));
         assert(r.find("Le temps GPU mesur") == std::string::npos);
         writeFile(dir + "/resume_exemple_ecarte.txt", r);
@@ -359,6 +359,47 @@ static void testSessionStats(const std::string& dir) {
     di.cpu = "AMD Ryzen 7 9800X3D 8-Core Processor"; di.gpu = "NVIDIA GeForce RTX 5090"; di.startText = "2026-10-11 21:05:40"; di.nowText = "2026-10-11 21:30:52"; di.wallSeconds = 1512.0;
     writeFile(dir + "/resume_exemple_mesure.txt", demo.format(di));
     std::printf("tests du resume de session : OK\n");
+}
+
+// Saccades : image plus de 2 fois plus longue que la cadence de la demi-seconde précédente, regroupées,
+// classées ; une cadence qui change durablement (reprojection) n'en fait qu'une ; les coupures non plus.
+static void testStutters() {
+    SessionStats st;
+    double t = 0.0;
+    const auto run = [&](int frames, double ms) { for (int i = 0; i < frames; ++i) { t += ms / 1000.0; st.onFrame(t, 5.f); } };
+    run(400, 1000.0 / 72.0);                          // cadence stable : rien
+    assert(st.stutterCount() == 0);
+    run(1, 30.0);                                     // 2,2 x : légère
+    run(100, 1000.0 / 72.0);
+    run(1, 50.0); run(1, 45.0);                       // deux images lentes d'affilée : une seule, modérée (3,6 x)
+    run(100, 1000.0 / 72.0);
+    run(1, 120.0);                                    // 8,6 x : forte, la pire
+    run(100, 1000.0 / 72.0);
+    assert(st.stutterCount() == 3);
+    run(200, 1000.0 / 36.0);                          // passage en reprojection : une saccade, puis nouvelle cadence
+    assert(st.stutterCount() == 4);
+    run(200, 1000.0 / 36.0);
+    assert(st.stutterCount() == 4);
+    t += 5.0;                                         // coupure (chargement) : pas une saccade
+    run(200, 1000.0 / 72.0);
+    assert(st.stutterCount() == 4);
+    run(900, 1000.0 / 240.0);                         // 240 FPS : 9 ms (2,2 x mais +4,9 ms) compte, 7 ms (+2,8 ms) non
+    run(1, 7.0);
+    assert(st.stutterCount() == 4);
+    run(50, 1000.0 / 240.0);
+    run(1, 9.0);
+    assert(st.stutterCount() == 5);
+    const std::string text = st.format(SessionInfo());
+    assert(has(text, "\r\nSACCADES   (image plus de 2 fois"));
+    assert(has(text, "  Saccades       : 5   ("));
+    assert(has(text, "  Pire saccade   : 120 ms   (\xC3\xA0 0:"));
+    assert(has(text, "  Fortes         : 1   (plus de 5 x)\r\n"));
+    assert(has(text, "  Mod\xC3\xA9r\xC3\xA9" "es       : 1   (3 \xC3\xA0 5 x)\r\n"));
+    assert(has(text, "  L\xC3\xA9g\xC3\xA8res        : 3   (2 \xC3\xA0 3 x la cadence)\r\n"));
+    assert(has(text, "VRAM Go  Sacc.\r\n"));
+    SessionInfo en; en.english = true;
+    assert(has(st.format(en), "  Stutters       : 5   (") && has(st.format(en), "  Severe         : 1   (over 5 x)\r\n"));
+    std::printf("tests des saccades : OK\n");
 }
 
 static void testRateMeter() {
@@ -1465,6 +1506,7 @@ int main(int argc, char** argv) {
     RUN(testImageFilters);
     RUN(testVideo);
     RUN(testStats);
+    RUN(testStutters);
     RUN(testAsciiText);
     RUN(testInfoLine);
     RUN(testFrameHistory);

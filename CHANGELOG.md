@@ -4,6 +4,13 @@
 
 Les nouveautés de chaque version d'XR Perf Overlay, la plus récente en premier.
 
+## 1.17.0
+
+- **Saccades mesurées** : une saccade est une image plus de 2 fois plus longue que la cadence de la demi-seconde précédente ; plusieurs d'affilée n'en font qu'une, et une baisse de cadence qui dure (reprojection) n'en est pas une.
+  - **Rapport** : nouvelle section *Saccades* avec le nombre et la fréquence par minute de jeu, le temps perdu, la pire (durée, moment, rapport à la cadence) et la répartition légères / modérées / fortes ; colonne *Sacc.* dans le relevé minute par minute.
+  - **Page Rapports** : section Saccades dans la lecture détaillée, courbe des saccades par minute, constat dans l'analyse, deux lignes dans la comparaison de sessions.
+  - **Panneau** : compteur de saccades en option sur la ligne de session (Panneau › Apparence), en orange deux secondes après chaque saccade. Jeux OpenXR et SteamVR.
+
 ## 1.16.4
 
 - **Filtres d'image sans effet dans certains jeux** (mod GTAVXR, par exemple) : quand l'image envoyée au casque n'est jamais celle que le jeu vient de rendre (le jeu change d'image ou de swapchain à chaque fois), les filtres ne s'appliquaient pas. La layer le détecte maintenant et filtre l'image au moment où elle est soumise au casque.
